@@ -330,33 +330,46 @@ def create_lines(A,B):
     n = len(A[0])-1
     
     for k in range(1, n+1):
-        line = []
+        line1 = []
+        line2 = []
         j = 0
         i = k
         while j < min(k, m):
             v1 = ((j,i),0)
             v2 = ((j,i-1),1)
-            line.append(v1)
-            line.append(v2)
+            
+            v3 = ((j,n-i),0)
+            v4 = ((j,n-i),1)
+            
+            line1.append(v1)
+            line1.append(v2)
+            line2.append(v3)
+            line2.append(v4)
             j+=1
             i-=1
-        line.append( ((min(k,m),i),0) )
-        L.append(line)
+        line1.append( ((j,n-i),0) )
+        line2.append( ((j,n-i),0) )
+        L.append(line1)
+        L.append(line2)
 
-        
     for k in range(1,m):
         line = []
-        i = n
-        j = k
-        while i < k:
+        i = k
+        j = n
+        
+        while i < m and j > 0:
             v1 = ((i,j),0)
             v2 = ((i,j-1),1)
+            
+            v3 = ((i,n-j),0)
+            v4 = ((
+            
             line.append(v1)
             line.append(v2)
             i+=1
             j-=1
-        line.append( ((max(k-1,),0) )
-        L.append(line)
+        line.append( ((i,j),0) )
+        #L.append(line)
         
     return L
     
@@ -394,8 +407,8 @@ def main():
     # Initialize the engine    
     pygame.init()
 
-    rows = 6
-    cols = 2
+    rows = 3
+    cols = 4
     block_edge = 120
 
     width = cols * block_edge
