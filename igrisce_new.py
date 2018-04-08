@@ -9,7 +9,6 @@ white = (255,255,255)
 blue = (0, 0, 255)
 red = (255, 0, 0)
 
-# TODO: Convert graph implementation from list to set
 
 # a <-> 0
 # b <-> 1
@@ -18,133 +17,94 @@ class FootballField:
 
     turn = 1    # team 1 or team 2
 
-    def __init__(self, V, E, team_1, team_2, ball):
+    def __init__(self, V, E, L, team_1, team_2, ball):
         self.V = V
         self.E = E
+        self.L = L
         self.team_1 = team_1
         self.team_2 = team_2
         self.ball = ball
-    
+
     def same_vertex(self, v1, v2):
-    
+
         loc1, table1 = v1
         loc2, table2 = v2
 
         return table1 == table2 and loc1[0] == loc2[0] and loc1[1] == loc2[1]
-     
-     
+
+
     def neighbors(self, v):
-        neighbors = []
-        for v1, v2 in self.E:
-            if self.same_vertex(v,v1):
-                neighbors.append(v2)
-            elif self.same_vertex(v,v2):
-                neighbors.append(v1)
-        return neighbors
-        
+
+        return set(u for u in self.V if (u,v) in self.E or (v,u) in self.E)
+
 
     def all_empty_fields(self):
-        
-        F = [v for v in self.V if not v in self.team_1 and not v in self.team_2 and not self.same_vertex(v, self.ball)]
-        return F
-        
+
+        return self.V - self.team_1 - self.team_2 - {self.ball}
+
+
     def possible_player_movements(self, player):
-        v0 = player
-        moves = []
-        for v1, v2 in self.E:
-            if self.same_vertex(v0,v1):
-                moves.append(v2)
-            elif self.same_vertex(v0,v2):
-                moves.append(v1)
-        
-        moves = [move for move in moves if move not in self.team_1 and move not in self.team_2 and not self.same_vertex(move, self.ball)]
-        return moves
-        
+
+        return self.neighbors(player) - self.team_1 - self.team_2 - {self.ball}
+
 
     def possible_ball_moves(self):
 
-        moves = []
+        team = self.team_1
+
         empty_fields = self.all_empty_fields()
-        
-        ball_neighbors = []
-        
-        for v1, v2 in self.E:
-            if self.same_vertex(self.ball, v1):
-                ball_neighbors.append(v2)
-            elif self.same_vertex(self.ball, v2):
-                ball_neighbors.append(v1)
-        
-        # all the players that are standing next to the ball (i.e. can move it)
-        players = [v for v in ball_neighbors if v in self.team_1]
-        
-        # all the empty fields adjacent to the ball
-        empty_fields_ball = [v for v in ball_neighbors if not v in self.team_1 and not v in self.team_2]
-        
-        # the neighboring vertices of all the players next to the ball (i.e. where they can move it)
-        player_neighbors = list(chain.from_iterable([(v for v in self.neighbors(p)) for p in players]))
+        ball_neighbors = self.neighbors(self.ball)
+        adjacent_players = ball_neighbors & self.team_1
+        adjacent_player_neighbors = set(chain.from_iterable(map(self.neighbors, adjacent_players)))
 
-        # player moves the ball around him
-        for v in empty_fields_ball:
-            for n in player_neighbors:
-                if self.same_vertex(v, n):
-                    moves.append(v)
-                    break
+        return adjacent_player_neighbors & empty_fields & ball_neighbors
 
-        return moves
-        
-        
+
     def possible_kicks(self):
 
         empty_fields = self.all_empty_fields()
         ball_neighbors = self.neighbors(self.ball)
-        team = self.team_1
+        players = ball_neighbors & self.team_1
 
-        # all the players that are standing next to the ball (i.e. can move it)
-        players = [v for v in ball_neighbors if v in team]
-        # player kicks the ball forward
-        kicks = []
-        loc_ball, table_ball = self.ball
+        kicks = set()
+
+        lines_with_ball = []
+        indices = []
+        for line in self.L:
+            try:
+                indices.append(line.index(self.ball))
+                lines_with_ball.append(line)
+            except ValueError:
+                continue
+
         for player in players:
-            loc, table = player
-            if table == table_ball:     # the ball is in the same table -> its either horizontal or vertical
-                if loc[0] == loc_ball[0]:    # horizontal 
-                    diff = loc[1] - loc_ball[1]
-                    k = loc_ball[1] - diff
-                    v = ((loc[0], k), table)
-                    while v in empty_fields:
-                        kicks.append(v)
-                        k -= diff
-                        v = ((loc[0], k), table)
-                elif loc[1] == loc_ball[1]:     # vertical
-                    diff = loc[0] - loc_ball[0]
-                    k = loc_ball[0] - diff
-                    v = ((k, loc[1]), table)
-                    while v in empty_fields:
-                        kicks.append(v)
-                        k -= diff
-                        v = ((k, loc[1]), table)
-                        
-            else:       # the ball is in a different table --> diagonal     
-                print(player)
-                print(self.ball)
-                diff_row = loc[0] - loc_ball[0]
-                diff_col = loc[1] - loc_ball[1]
-                
-                if table_ball == 1:     # the ball is in table B_j
-                    k = loc_ball[0] - diff_row + 1
-                    l = loc_ball[1] - diff_col + 1
-                else:
-                    k = loc_ball[0] - diff_row - 1
-                    l = loc_ball[1] - diff_col - 1
-                v = ((k,l), (table_ball+1) % 2)
-                while v in empty_fields:
-                    kicks.append(v)
-                    #k = k - diff_row - (v[1]+1)%2
-                    k = k - diff_row
-                    #l = l - diff_col - (v[1]+1)%2
-                    l = l - diff_col
-                    v = ((k,l), (v[1]+1)%2)
-                    
+            for ind_ball, line in zip(indices, lines_with_ball):
+                try:
+                    ind_player = line.index(player)
+                    direction = ind_ball - ind_player
+                except ValueError:
+                    continue
+
+
+        for line in self.L:
+            try:
+                id_ball = line.index(self.ball)
+                for player in players:
+                    try:
+                        id_player = line.index(player)
+                        direction = id_ball - id_player
+                        if direction == 1:
+                            kick = line[id_ball+1:]
+                        elif direction == -1:
+                            kick = line[:id_ball]
+                        kicks.update(kick)
+                    except ValueError:
+                        # player not in line
+                        continue
+            except ValueError:
+                # ball not in line
+                continue
+
         return kicks
 
 
@@ -153,18 +113,18 @@ class FootballField:
         # team represents the team whose turn it is, as only they can move then
         team = self.team_1
         return self.player in team and (player, self.ball) in self.E
-        
+
 
 
 
 def draw_horizontal(screen, color, P, r):
     for i in range(len(P)):
         for j in range(len(P[i]) - 1):
-        
+
             x0, y0 = P[i][j]
             x1, y1 = P[i][j+1]
             pygame.draw.line(screen, color, (x0+r, y0), (x1-r,y1))
-        
+
 
 def draw_vertical(screen, color, P, r):
     for i in range(len(P) - 1):
@@ -172,69 +132,69 @@ def draw_vertical(screen, color, P, r):
             x0, y0 = P[i][j]
             x1, y1 = P[i+1][j]
             pygame.draw.line(screen, color, (x0, y0+r), (x1, y1-r))
-        
-        
+
+
 def draw_diagonal(screen, color, A, B, r):
 
     for i in range(len(B)):
         for j in range(len(B[i])):
-        
+
             x0,y0 = B[i][j]
             x1,y1 = A[i][j]
             x2,y2 = A[i][j+1]
             x3,y3 = A[i+1][j]
             x4,y4 = A[i+1][j+1]
-            
+
             q = sqrt(2)/2 * r
-            
+
             pygame.draw.line(screen, color, (x0 - q, y0 - q), (x1 + q, y1 + q))
             pygame.draw.line(screen, color, (x0 + q, y0 - q), (x2 - q, y2 + q))
             pygame.draw.line(screen, color, (x0 - q, y0 + q), (x3 + q, y3 - q))
             pygame.draw.line(screen, color, (x0 + q, y0 + q), (x4 - q, y4 - q))
 
- 
+
 def draw_positions(screen, A, B, r):
- 
+
     white = (255,255,255)
     for row in A:
         for a in row:
             pygame.draw.circle(screen, white, a, r)
-    
+
     for row in B:
         for b in row:
             pygame.draw.circle(screen, white, b, r)
-    
- 
+
+
 def draw_players(screen, color, players, A, B, r):
-    
+
     for player in players:
         loc, table = player
         i,j = loc
-        
+
         if table == 0: # table is A
             pygame.draw.circle(screen, color, A[i][j], r)
         elif table == 1: # table is B
             pygame.draw.circle(screen, color, B[i][j], r)
-    
+
 
 def draw_ball(screen, color, ball, A, B, r):
     loc, table = ball
     i,j = loc
-    
+
     if table == 0: # table is A
         pygame.draw.circle(screen, color, A[i][j], r)
     elif table == 1: # table is B
         pygame.draw.circle(screen, color, B[i][j], r)
- 
+
 
 def draw_field(screen, A, B, state, r = 12, dont_draw = []):
 
-    
-    team_1 = list(set(state.team_1)-set(dont_draw))
-    team_2 = list(set(state.team_2)-set(dont_draw))
-    
+
+    team_1 = state.team_1 - set(dont_draw)
+    team_2 = state.team_2 - set(dont_draw)
+
     draw_positions(screen, A, B, r)
-    
+
     draw_horizontal(screen, black, A, r)
     draw_horizontal(screen, black, B, r)
 
@@ -249,130 +209,129 @@ def draw_field(screen, A, B, state, r = 12, dont_draw = []):
     draw_players(screen, black, team_1, A, B, r) # team 1 is black
     draw_players(screen, red, team_2, A, B, r)  # team 2 is red
 
-    
+
 def draw_goals(screen, color, goal_1, goal_2):
-    
+
     pygame.draw.lines(screen, black, False, goal_1, 3) # draw the North goal
     pygame.draw.lines(screen, black, False, goal_2, 3) # draw the South goal
-        
-        
+
+
 def create_edges(A,B):
     E = set()
     for i in range(len(A)):
-        for j in range(len(A[i]) - 1):  
+        for j in range(len(A[i]) - 1):
             edge = (((i,j),0), ((i,j+1),0)) # a_ij -----> a_ij+1
             E.add(edge)
-        
+
     for i in range(len(B)):
-        for j in range(len(B[i]) - 1):    
+        for j in range(len(B[i]) - 1):
             edge = (((i,j),1), ((i,j+1),1)) # b_ij -----> b_ij+1
             E.add(edge)
-            
+
     for i in range(len(A) - 1):
         for j in range(len(A[i])):
             edge = (((i,j),0), ((i+1,j),0))
             E.add(edge)
-    
+
     for i in range(len(B) - 1):
         for j in range(len(B[i])):
             edge = (((i,j),1), ((i+1,j),1))
             E.add(edge)
-            
+
     for i in range(len(B)):
         for j in range(len(B[i])):
-            
+
             edge1 = ( ((i,j),1), ((i,j),0) )
             edge2 = ( ((i,j),1), ((i,j+1),0) )
             edge3 = ( ((i,j),1), ((i+1,j),0) )
             edge4 = ( ((i,j),1), ((i+1,j+1),0) )
-               
+
             E.add(edge1)
             E.add(edge2)
             E.add(edge3)
             E.add(edge4)
-            
+
     return E
 
 def create_lines(A,B):
     L = []
-    
-    """
+
     for i in range(len(A)):     # for each row in A
         line = []
-        for j in range(len(A[i])):  
+        for j in range(len(A[i])):
             line.append( ((i,j),0) )
         if len(line) > 1:
-            L.append(line)  
+            L.append(line)
     for i in range(len(B)):     # for each row in A
         line = []
-        for j in range(len(B[i])):  
+        for j in range(len(B[i])):
             line.append( ((i,j),1) )
         if len(line) > 1:
-            L.append(line)  
-    
+            L.append(line)
+
     for i in range(len(A[0])):
         line = []
         for j in range(len(A)):
             line.append( ((j,i),0) )
         if len(line) > 1:
-            L.append(line)  
-   
+            L.append(line)
+
     for i in range(len(B[0])):
         line = []
         for j in range(len(B)):
             line.append( ((j,i),1) )
         if len(line) > 1:
             L.append(line)
-        
-    """
-    
+
     m = len(A)-1
     n = len(A[0])-1
-    
+
     for k in range(1, n+1):
         line1 = []
         line2 = []
-        j = 0
-        i = k
-        while j < min(k, m):
-            v1 = ((j,i),0)
-            v2 = ((j,i-1),1)
-            
-            v3 = ((j,n-i),0)
-            v4 = ((j,n-i),1)
-            
+        i = 0
+        j = k
+        while i < m and j > 0:
+            v1 = ((i,j),0)
+            v2 = ((i,j-1),1)
+            v3 = ((i,n-j),0)
+            v4 = ((i,n-j),1)
             line1.append(v1)
             line1.append(v2)
             line2.append(v3)
             line2.append(v4)
-            j+=1
-            i-=1
-        line1.append( ((j,n-i),0) )
-        line2.append( ((j,n-i),0) )
+            i+=1
+            j-=1
+        line1.append( ((i,j),0) )
+        line2.append( ((i,n-j),0) )
         L.append(line1)
         L.append(line2)
 
+
     for k in range(1,m):
-        line = []
+        line1 = []
+        line2 = []
         i = k
         j = n
-        
+
         while i < m and j > 0:
             v1 = ((i,j),0)
             v2 = ((i,j-1),1)
-            
             v3 = ((i,n-j),0)
-            v4 = ((
-            
-            line.append(v1)
-            line.append(v2)
+            v4 = ((i,n-j),1)
+            line1.append(v1)
+            line1.append(v2)
+            line2.append(v3)
+            line2.append(v4)
             i+=1
             j-=1
-        line.append( ((i,j),0) )
-        #L.append(line)
-        
+        line1.append( ((i,j),0) )
+        line2.append( ((i,n-j),0) )
+        L.append(line1)
+        L.append(line2)
+
     return L
-    
+
 def getClickedVertex(x0,y0,A,B,r=12):
     v = None
     for i in range(len(A)):
@@ -391,7 +350,7 @@ def getClickedVertex(x0,y0,A,B,r=12):
 
 
 def getCoordinates(v, A, B):
-    
+
     loc, table = v
     i,j = loc
     if table == 0:
@@ -400,14 +359,14 @@ def getCoordinates(v, A, B):
         return B[i][j]
 
 
-        
+
 
 def main():
-        
-    # Initialize the engine    
+
+    # Initialize the engine
     pygame.init()
 
-    rows = 3
+    rows = 5
     cols = 4
     block_edge = 120
 
@@ -424,7 +383,7 @@ def main():
     goalDepth = 16
 
     screen.fill(green)
-    
+
     # Fill background
     background = pygame.Surface(screen.get_size())
     background = background.convert()
@@ -450,10 +409,10 @@ def main():
             point = (int(round(a/2 + i * a)), a + j * a)
             A_j.append(point)
             V.add(((j,i), 0))
-        
+
         A.append(A_j)
         if j == rows-2:
-            break  
+            break
         for i in range(1, cols):
             point = ( i * a, j * a + int(round(a + a/2)))
             B_j.append(point)
@@ -461,56 +420,48 @@ def main():
         B.append(B_j)
 
     E = create_edges(A,B)
-    
+
     L = create_lines(A,B)
-    
-    print("lines: ")
-    for line in L:
-        print(line)
 
-       
-        
-    team_1 = [   ]
-    team_2 = [  ]
-    ball = ((0,0),0)
-    
-    state = FootballField(V, E, team_1, team_2, ball)
-    
-    
-    screen.fill(green)
-    draw_field(screen, A, B, state, 12)    # draw the field without the vertex v
-    draw_goals(screen, black, goal_1, goal_2)
-    pygame.display.flip()
-    pygame.image.save(screen, "igrisce.bmp")
+    team_1 = { ((0,0),1), ((0,1),1) }
+    team_2 = { ((1,2),0) }
+    ball = ((1,1),0)
 
-    return 
-    
+    state = FootballField(V, E, L, team_1, team_2, ball)
+
+
+    # The main execution loop
     running = True
     v = None
     while running:
         screen.fill(green)
         draw_field(screen, A, B, state, 12, [v])    # draw the field without the vertex v
         draw_goals(screen, black, goal_1, goal_2)
-        
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False   
+                running = False
+
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x0,y0 = pygame.mouse.get_pos()
                 v = getClickedVertex(x0,y0,A,B)
+
             elif event.type == pygame.MOUSEMOTION:
                 if v == None:
                     continue
-                x0,y0 = pygame.mouse.get_pos()  
+                # save the current mouse position
+                x0,y0 = pygame.mouse.get_pos()
+
             elif event.type == pygame.MOUSEBUTTONUP:
                 if v == None:
                     continue
                 new_pos = None
-                
+
+                # we are moving the ball
                 if state.same_vertex(v, state.ball):
                     moves = state.possible_ball_moves()
                     kicks = state.possible_kicks()
-                    print(kicks)
+                    # test if the location of the mouse release of is inside a circle that represents a legal move (dribble/kick)
                     for move in moves:
                         x,y = getCoordinates(move, A,B)
                         if sqrt((x-x0)**2+(y-y0)**2) < player_radius:
@@ -520,33 +471,40 @@ def main():
                         x,y = getCoordinates(kick, A,B)
                         if sqrt((x-x0)**2+(y-y0)**2) < player_radius:
                             new_pos = kick
-                            break        
+                            break
+                # we are moving a player
                 else:
                     moves = state.possible_player_movements(v)
                     for move in moves:
                         x,y = getCoordinates(move, A,B)
                         if sqrt((x-x0)**2+(y-y0)**2) < player_radius:
                             new_pos = move
-                            break  
+                            break
+                # this means the release point does not represent a legal move
                 if new_pos == None:
                     v = None
                     continue
+                # we are moving a player from team 1 (will have to change this so we can only move a player on the team whose turn it is)
                 if v in state.team_1:
-                    state.team_1 = list((set(state.team_1)-set([v])) | set([new_pos]) )
+                    state.team_1.remove(v)
+                    state.team_1.add(new_pos)
                 elif v in state.team_2:
-                    state.team_2 = list((set(state.team_2)-set([v])) | set([new_pos]) )
+                    state.team_2.remove(v)
+                    state.team_2.add(new_pos)
+                # we are moving the ball
                 elif state.same_vertex(state.ball, v):
                     state.ball = new_pos
-                v = None
-                break
 
+                v = None
+
+        # draw the thing we are moving, whether be it a player or the ball
         if not v == None and v in state.team_1:
             pygame.draw.circle(screen, black, (x0,y0), 12)
         elif not v == None and v in state.team_2:
             pygame.draw.circle(screen, red, (x0,y0), 12)
         elif not v == None and state.same_vertex(v, state.ball):
             pygame.draw.circle(screen, blue, (x0,y0), 9)
-            
+
 
         pygame.display.flip()
     pygame.image.save(screen, "igrisce.bmp")
